@@ -84,7 +84,7 @@ static bool priority_higher(const struct list_elem *a, const struct list_elem *b
 	struct thread *at = list_entry(a, struct thread, elem);
 	struct thread *bt = list_entry(b, struct thread, elem);
 
-	if (at->priority >= bt->priority) return true;
+	if (at->priority > bt->priority) return true;
 	else return false;
 }
 
@@ -212,6 +212,9 @@ thread_create (const char *name, int priority,
 	/* 실행 대기 큐에 추가한다. */
 	thread_unblock (t);
 
+	if ((t->priority) > thread_current()->priority)
+		thread_yield();
+
 	return tid;
 }
 
@@ -314,7 +317,11 @@ thread_yield (void) {
 void
 thread_set_priority (int new_priority) {
 	thread_current ()->priority = new_priority;
-	
+	if (list_empty(&ready_list)) return;
+	struct list_elem *h_elem = list_front(&ready_list);
+	struct thread *ht = list_entry(h_elem, struct thread, elem);
+	if (!list_empty(&ready_list) && ((thread_current ()->priority) < ht->priority))
+		thread_yield();
 }
 
 /* 현재 스레드의 우선순위를 반환한다. */
