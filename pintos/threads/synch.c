@@ -181,6 +181,10 @@ lock_acquire (struct lock *lock) {
 	ASSERT (!intr_context ());
 	ASSERT (!lock_held_by_current_thread (lock));
 
+	if((lock->semaphore.value == 0) && lock->holder != NULL && (lock->holder->priority < thread_current()->priority))
+	{
+		lock->holder->priority = thread_current()->priority;
+	}
 	sema_down (&lock->semaphore);
 	lock->holder = thread_current ();
 }
@@ -213,7 +217,9 @@ lock_release (struct lock *lock) {
 	ASSERT (lock_held_by_current_thread (lock));
 
 	lock->holder = NULL;
+	thread_current()->priority = thread_current()->origin_priority;
 	sema_up (&lock->semaphore);
+	
 }
 
 /* 현재 스레드가 LOCK을 소유하면 true, 그렇지 않으면 false를 반환한다.
