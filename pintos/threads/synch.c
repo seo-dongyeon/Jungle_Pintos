@@ -99,15 +99,22 @@ sema_try_down (struct semaphore *sema) {
 void
 sema_up (struct semaphore *sema) {
 	enum intr_level old_level;
-
+	struct thread *ht = NULL;
 	ASSERT (sema != NULL);
 
 	old_level = intr_disable ();
 	if (!list_empty (&sema->waiters))
-		thread_unblock (list_entry (list_pop_front (&sema->waiters),
-					struct thread, elem));
+	{
+		list_sort(&sema->waiters, priority_higher, NULL);
+		ht = list_entry (list_pop_front (&sema->waiters), struct thread, elem);
+		thread_unblock (ht);
+		
+	}
 	sema->value++;
 	intr_set_level (old_level);
+
+	if ((ht != NULL) && ((thread_current ()->priority) < ht->priority))
+		thread_yield();
 }
 
 static void sema_test_helper (void *sema_);
@@ -265,6 +272,22 @@ cond_wait (struct condition *cond, struct lock *lock) {
 	lock_acquire (lock);
 }
 
+/* a와 b의 semaphore_elem에 대응하는 대기 스레드의 우선순위를 비교한다.
+ a의 대기 스레드가 더 높은 우선순위이면 true를 반환한다.
+ 우선순위가 같거나 낮으면 false를 반환하여 같은 우선순위의 대기 순서를 유지한다. */
+static bool cond_priority_higher(const struct list_elem *a, const struct list_elem *b, void *aux)
+{
+	struct semaphore_elem *as = list_entry(a, struct semaphore_elem, elem);
+	struct semaphore_elem *ab = list_entry(b, struct semaphore_elem, elem);
+	struct list_elem *ae = list_front(&as->semaphore.waiters);
+	struct list_elem *be = list_front(&ab->semaphore.waiters);
+	struct thread *at = list_entry(ae, struct thread, elem);
+	struct thread *bt = list_entry(be, struct thread, elem);
+
+	if (at->priority > bt->priority) return true;
+	else return false;
+}
+
 /* LOCK으로 보호되는 COND를 기다리는 스레드가 있으면,
    그중 하나에 신호를 보내 대기에서 깨어나게 한다.
    이 함수를 호출하기 전에 LOCK을 소유하고 있어야 한다.
@@ -277,10 +300,14 @@ cond_signal (struct condition *cond, struct lock *lock UNUSED) {
 	ASSERT (lock != NULL);
 	ASSERT (!intr_context ());
 	ASSERT (lock_held_by_current_thread (lock));
+	struct semaphore *sm = NULL;
 
 	if (!list_empty (&cond->waiters))
-		sema_up (&list_entry (list_pop_front (&cond->waiters),
-					struct semaphore_elem, elem)->semaphore);
+	{
+		list_sort((&cond->waiters), cond_priority_higher, NULL);
+		sm = &list_entry (list_pop_front (&cond->waiters), struct semaphore_elem, elem)->semaphore;
+		sema_up (sm);
+	}
 }
 
 /* LOCK으로 보호되는 COND를 기다리는 스레드가 있으면 모두 깨운다.

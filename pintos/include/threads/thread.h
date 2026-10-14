@@ -144,5 +144,6 @@ int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
 
 void do_iret (struct intr_frame *tf);
+bool priority_higher(const struct list_elem *a, const struct list_elem *b, void *aux);
 
 #endif /* threads/thread.h */

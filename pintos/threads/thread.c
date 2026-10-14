@@ -79,7 +79,7 @@ static tid_t allocate_tid (void);
 static uint64_t gdt[3] = { 0, 0x00af9a000000ffff, 0x00cf92000000ffff };
 
 // a와 b의 우선순위를 비교해서 a가 높거나 같으면 true, a가 낮으면 false 반환 
-static bool priority_higher(const struct list_elem *a, const struct list_elem *b, void *aux)
+bool priority_higher(const struct list_elem *a, const struct list_elem *b, void *aux)
 {
 	struct thread *at = list_entry(a, struct thread, elem);
 	struct thread *bt = list_entry(b, struct thread, elem);
@@ -318,6 +318,7 @@ void
 thread_set_priority (int new_priority) {
 	thread_current ()->priority = new_priority;
 	if (list_empty(&ready_list)) return;
+
 	struct list_elem *h_elem = list_front(&ready_list);
 	struct thread *ht = list_entry(h_elem, struct thread, elem);
 	if (!list_empty(&ready_list) && ((thread_current ()->priority) < ht->priority))
